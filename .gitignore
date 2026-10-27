@@ -1,0 +1,11 @@
+*.user
+*.user.*
+build/
+*.o
+*.obj
+Makefile*
+.moc/
+.rcc/
+.ui/
+debug/
+release/
