@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>AboutDialog</class>
+ <widget class="QDialog" name="AboutDialog">
+  <property name="windowTitle"><string>关于简单文本编辑器</string></property>
+  <property name="windowIcon"><iconset resource="resources.qrc"><normaloff>:/icons/editor.svg</normaloff>:/icons/editor.svg</iconset></property>
+  <property name="minimumSize"><size><width>430</width><height>300</height></size></property>
+  <layout class="QVBoxLayout" name="verticalLayout">
+   <property name="spacing"><number>16</number></property>
+   <property name="leftMargin"><number>28</number></property>
+   <property name="topMargin"><number>24</number></property>
+   <property name="rightMargin"><number>28</number></property>
+   <property name="bottomMargin"><number>20</number></property>
+   <item><widget class="QLabel" name="titleLabel">
+    <property name="font"><font><pointsize>23</pointsize><bold>true</bold></font></property>
+    <property name="text"><string>简单文本编辑器</string></property>
+    <property name="alignment"><set>Qt::AlignCenter</set></property>
+   </widget></item>
+   <item><layout class="QHBoxLayout" name="detailsLayout">
+    <item><widget class="QLabel" name="iconLabel"><property name="minimumSize"><size><width>96</width><height>96</height></size></property><property name="pixmap"><pixmap resource="resources.qrc">:/icons/editor.svg</pixmap></property><property name="scaledContents"><bool>true</bool></property><property name="maximumSize"><size><width>96</width><height>96</height></size></property></widget></item>
+    <item><layout class="QVBoxLayout" name="infoLayout">
+     <item><widget class="QLabel" name="developerLabel"><property name="text"><string>开发者：龙智森</string></property></widget></item>
+     <item><widget class="QLabel" name="studentLabel"><property name="text"><string>学号：2024414290224</string></property></widget></item>
+     <item><widget class="QLabel" name="courseLabel"><property name="text"><string>Qt 应用程序开发 · 实验二</string></property></widget></item>
+    </layout></item>
+   </layout></item>
+   <item><widget class="QLabel" name="versionLabel"><property name="text"><string>版本 1.0</string></property></widget></item>
+   <item><widget class="QDialogButtonBox" name="buttonBox"><property name="standardButtons"><set>QDialogButtonBox::Ok</set></property></widget></item>
+  </layout>
+ </widget>
+ <resources><include location="resources.qrc"/></resources>
+ <connections/>
+</ui>

@@ -1,0 +1,14 @@
+QT += core gui widgets testlib
+CONFIG += c++17 testcase console
+CONFIG -= app_bundle
+TEMPLATE = app
+TARGET = editor_tests
+INCLUDEPATH += ..
+SOURCES += editor_tests.cpp ../mainwindow.cpp ../codeeditor.cpp ../searchdialog.cpp ../aboutdialog.cpp
+HEADERS += ../mainwindow.h ../codeeditor.h ../searchdialog.h ../aboutdialog.h
+FORMS += ../mainwindow.ui ../searchdialog.ui ../aboutdialog.ui
+RESOURCES += ../resources.qrc
+OBJECTS_DIR = .obj
+MOC_DIR = .moc
+RCC_DIR = .rcc
+UI_DIR = .ui

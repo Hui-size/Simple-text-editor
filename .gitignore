@@ -1,11 +1,14 @@
 *.user
 *.user.*
 build/
+build-*/
+.qmake.stash
 *.o
 *.obj
 Makefile*
 .moc/
 .rcc/
 .ui/
+.obj/
 debug/
 release/

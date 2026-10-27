@@ -1,46 +1,142 @@
 #include "searchdialog.h"
+#include "ui_searchdialog.h"
 #include "codeeditor.h"
-#include <QCheckBox>
-#include <QFormLayout>
-#include <QHBoxLayout>
-#include <QLabel>
-#include <QLineEdit>
-#include <QMessageBox>
-#include <QPushButton>
+
 #include <QTextCursor>
-#include <QVBoxLayout>
-SearchDialog::SearchDialog(CodeEditor *e, bool replaceMode, QWidget *parent) : QDialog(parent), editor(e) {
-    setWindowTitle(replaceMode ? tr("替换") : tr("查找")); setAttribute(Qt::WA_DeleteOnClose);
-    findEdit = new QLineEdit(this); replaceEdit = new QLineEdit(this); caseBox = new QCheckBox(tr("区分大小写"), this); wholeBox = new QCheckBox(tr("全字匹配"), this);
-    auto *form = new QFormLayout; form->addRow(tr("查找内容："), findEdit); if (replaceMode) form->addRow(tr("替换为："), replaceEdit);
-    auto *options = new QHBoxLayout; options->addWidget(caseBox); options->addWidget(wholeBox); options->addStretch();
-    auto *buttons = new QHBoxLayout; auto *findButton = new QPushButton(tr("查找下一个"), this); buttons->addWidget(findButton);
-    connect(findButton, &QPushButton::clicked, this, [this] { findNext(); }); connect(findEdit, &QLineEdit::returnPressed, this, [this] { findNext(); });
-    if (replaceMode) { auto *one = new QPushButton(tr("替换"), this); auto *all = new QPushButton(tr("全部替换"), this); buttons->addWidget(one); buttons->addWidget(all); connect(one, &QPushButton::clicked, this, &SearchDialog::replaceOne); connect(all, &QPushButton::clicked, this, &SearchDialog::replaceAll); }
-    auto *close = new QPushButton(tr("关闭"), this); buttons->addWidget(close); connect(close, &QPushButton::clicked, this, &QDialog::close);
-    auto *layout = new QVBoxLayout(this); layout->addLayout(form); layout->addLayout(options); layout->addLayout(buttons);
-    findEdit->setText(editor->textCursor().selectedText()); findEdit->selectAll(); findEdit->setFocus();
+
+SearchDialog::SearchDialog(CodeEditor *editor, bool replaceMode, QWidget *parent)
+    : QDialog(parent), ui(new Ui::SearchDialog), editor(editor)
+{
+    ui->setupUi(this);
+    setAttribute(Qt::WA_DeleteOnClose);
+    setWindowTitle(replaceMode ? tr("替换") : tr("查找"));
+    setWindowIcon(QIcon(replaceMode ? QStringLiteral(":/icons/replace.svg")
+                                   : QStringLiteral(":/icons/find.svg")));
+    ui->replaceLabel->setVisible(replaceMode);
+    ui->replaceEdit->setVisible(replaceMode);
+    ui->replaceButton->setVisible(replaceMode);
+    ui->replaceAllButton->setVisible(replaceMode);
+
+    connect(ui->findButton, &QPushButton::clicked, this, &SearchDialog::findNext);
+    connect(ui->replaceButton, &QPushButton::clicked, this, &SearchDialog::replaceOne);
+    connect(ui->replaceAllButton, &QPushButton::clicked, this, &SearchDialog::replaceAll);
+    connect(ui->closeButton, &QPushButton::clicked, this, &QDialog::close);
+    connect(ui->findEdit, &QLineEdit::textChanged, this, &SearchDialog::updateButtons);
+    // 默认按钮处理 Enter，避免与 returnPressed 重复触发两次查找。
+    ui->findButton->setDefault(true);
+    ui->findEdit->setText(editor->textCursor().selectedText());
+    updateButtons();
+    focusSearchText();
 }
-bool SearchDialog::findNext(bool notify) {
-    QString term = findEdit->text(); if (term.isEmpty()) { if (notify) QMessageBox::information(this, tr("查找"), tr("请输入查找内容。")); return false; }
-    QTextDocument::FindFlags flags; if (caseBox->isChecked()) flags |= QTextDocument::FindCaseSensitively; if (wholeBox->isChecked()) flags |= QTextDocument::FindWholeWords;
-    if (editor->find(term, flags)) return true;
-    QTextCursor saved = editor->textCursor(), start = saved; start.movePosition(QTextCursor::Start); editor->setTextCursor(start);
-    if (editor->find(term, flags)) return true;
-    editor->setTextCursor(saved); if (notify) QMessageBox::information(this, tr("查找"), tr("未找到“%1”。").arg(term)); return false;
+
+SearchDialog::~SearchDialog()
+{
+    delete ui;
 }
-void SearchDialog::replaceOne() {
-    QString term = findEdit->text(); if (term.isEmpty()) { findNext(); return; }
-    auto cursor = editor->textCursor(); Qt::CaseSensitivity cs = caseBox->isChecked() ? Qt::CaseSensitive : Qt::CaseInsensitive;
-    bool selectedMatch = cursor.hasSelection() && cursor.selectedText().compare(term, cs) == 0;
-    if (selectedMatch && wholeBox->isChecked()) { QTextCursor start(editor->document()); start.setPosition(cursor.selectionStart()); QTextDocument::FindFlags flags = QTextDocument::FindWholeWords; if (caseBox->isChecked()) flags |= QTextDocument::FindCaseSensitively; QTextCursor match = editor->document()->find(term, start, flags); selectedMatch = !match.isNull() && match.selectionStart() == cursor.selectionStart() && match.selectionEnd() == cursor.selectionEnd(); }
-    if (!selectedMatch) { if (!findNext()) return; cursor = editor->textCursor(); }
-    cursor.insertText(replaceEdit->text()); editor->setTextCursor(cursor); findNext(false);
+
+void SearchDialog::focusSearchText()
+{
+    ui->findEdit->setFocus();
+    ui->findEdit->selectAll();
 }
-void SearchDialog::replaceAll() {
-    QString term = findEdit->text(); if (term.isEmpty()) { findNext(); return; }
-    QTextDocument::FindFlags flags; if (caseBox->isChecked()) flags |= QTextDocument::FindCaseSensitively; if (wholeBox->isChecked()) flags |= QTextDocument::FindWholeWords;
-    QTextCursor cursor(editor->document()); cursor.beginEditBlock(); int count = 0;
-    while (!(cursor = editor->document()->find(term, cursor, flags)).isNull()) { cursor.insertText(replaceEdit->text()); ++count; }
-    QTextCursor end(editor->document()); end.endEditBlock(); QMessageBox::information(this, tr("替换"), tr("已替换 %1 处。").arg(count));
+
+void SearchDialog::updateButtons()
+{
+    const bool available = !ui->findEdit->text().isEmpty();
+    ui->findButton->setEnabled(available);
+    ui->replaceButton->setEnabled(available);
+    ui->replaceAllButton->setEnabled(available);
+    ui->messageLabel->clear();
+}
+
+QTextDocument::FindFlags SearchDialog::findFlags(bool includeDirection) const
+{
+    QTextDocument::FindFlags flags;
+    if (ui->caseBox->isChecked())
+        flags |= QTextDocument::FindCaseSensitively;
+    if (ui->wholeBox->isChecked())
+        flags |= QTextDocument::FindWholeWords;
+    if (includeDirection && ui->upButton->isChecked())
+        flags |= QTextDocument::FindBackward;
+    return flags;
+}
+
+bool SearchDialog::findNext()
+{
+    const QString term = ui->findEdit->text();
+    if (term.isEmpty()) {
+        ui->messageLabel->setText(tr("请输入查找内容。"));
+        return false;
+    }
+    const auto flags = findFlags();
+    const QTextCursor saved = editor->textCursor();
+    if (editor->find(term, flags)) {
+        ui->messageLabel->clear();
+        return true;
+    }
+
+    // 越过文档边界后循环查找；完全没有匹配时恢复原光标和选区。
+    QTextCursor boundary(editor->document());
+    boundary.movePosition(flags.testFlag(QTextDocument::FindBackward)
+                          ? QTextCursor::End : QTextCursor::Start);
+    editor->setTextCursor(boundary);
+    if (editor->find(term, flags)) {
+        ui->messageLabel->setText(tr("已到文档边界，继续循环查找。"));
+        return true;
+    }
+    editor->setTextCursor(saved);
+    ui->messageLabel->setText(tr("未找到“%1”。").arg(term));
+    return false;
+}
+
+void SearchDialog::replaceOne()
+{
+    const QString term = ui->findEdit->text();
+    if (term.isEmpty()) {
+        findNext();
+        return;
+    }
+    QTextCursor cursor = editor->textCursor();
+    // 用同一组查找规则验证选区，防止“全字匹配”替换了单词的一部分。
+    QTextCursor from(editor->document());
+    from.setPosition(cursor.selectionStart());
+    const QTextCursor match = editor->document()->find(term, from, findFlags(false));
+    const bool selectedMatch = cursor.hasSelection() && !match.isNull()
+            && match.selectionStart() == cursor.selectionStart()
+            && match.selectionEnd() == cursor.selectionEnd();
+    if (!selectedMatch) {
+        if (!findNext())
+            return;
+        cursor = editor->textCursor();
+    }
+    cursor.insertText(ui->replaceEdit->text());
+    editor->setTextCursor(cursor);
+    if (findNext())
+        ui->messageLabel->setText(tr("已替换 1 处，已选中下一个匹配项。"));
+    else
+        ui->messageLabel->setText(tr("已替换 1 处，没有更多匹配项。"));
+}
+
+void SearchDialog::replaceAll()
+{
+    const QString term = ui->findEdit->text();
+    if (term.isEmpty()) {
+        findNext();
+        return;
+    }
+    const auto flags = findFlags(false);
+    QTextCursor editBlock(editor->document());
+    QTextCursor cursor(editor->document());
+    int count = 0;
+    editBlock.beginEditBlock();
+    while (true) {
+        cursor = editor->document()->find(term, cursor, flags);
+        if (cursor.isNull())
+            break;
+        // 从替换后的末尾继续，替换词包含查找词也不会反复处理刚插入的内容。
+        cursor.insertText(ui->replaceEdit->text());
+        ++count;
+    }
+    editBlock.endEditBlock();
+    ui->messageLabel->setText(count ? tr("已替换 %1 处。").arg(count) : tr("未找到“%1”，替换 0 处。").arg(term));
 }
